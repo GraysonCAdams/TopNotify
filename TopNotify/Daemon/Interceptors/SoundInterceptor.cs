@@ -200,7 +200,12 @@ namespace TopNotify.Daemon
             // Enqueue Instead Of Dropping: Two Notifications Arriving Close Together
             // (E.g. Two Chat Apps Within The Same Second) Now Both Get A Sound Cue,
             // Played In Order, Instead Of The Second One Silently Vanishing.
-            if (!soundQueue.TryAdd(soundFilePath))
+            //
+            // NOTE: TryAdd(item) WITHOUT a timeout is NOT a non-blocking call on
+            // BlockingCollection<T> - it behaves like Add() and blocks the calling
+            // thread (here, the WinRT notification-event thread) until space frees up.
+            // Passing TimeSpan.Zero is what actually makes this a non-blocking attempt.
+            if (!soundQueue.TryAdd(soundFilePath, TimeSpan.Zero))
             {
                 Program.Logger.Warning($"SoundInterceptor: queue full ({MAX_QUEUED_SOUNDS} pending), dropping sound for {appRef.ID}");
             }

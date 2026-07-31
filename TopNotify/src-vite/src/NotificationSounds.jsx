@@ -12,7 +12,7 @@ import {
     DrawerHeader
 } from "@chakra-ui/react";
 import React from "react";
-import { TbAlertTriangle, TbCheck, TbChevronDown, TbFolder, TbMusicPlus, TbPencil, TbVolume, TbX } from "react-icons/tb";
+import { TbAlertTriangle, TbCheck, TbChevronDown, TbFolder, TbMusicPlus, TbPencil, TbTrash, TbVolume, TbX } from "react-icons/tb";
 
 export default function ManageNotificationSounds() {
 
@@ -56,10 +56,10 @@ export default function ManageNotificationSounds() {
         UploadConfig();
     };
 
-    // Bumps The SoundPicker Remount Key After A Successful Import So The Freshly
-    // Imported File Shows Up In "Your Collection" - The User Then Selects It Themselves
-    // From The List Rather Than Having It Auto-Applied.
-    let onSoundImported = () => setImportRefreshCounter(importRefreshCounter + 1);
+    // Bumps The SoundPicker Remount Key After A Successful Import Or Delete So The List
+    // Reflects The Change - The User Then Selects Imported Sounds Themselves Rather Than
+    // Having Them Auto-Applied.
+    let onSoundListChanged = () => setImportRefreshCounter(importRefreshCounter + 1);
 
     return (
         <div className="flexx facenter fillx gap20 buttonContainer">
@@ -102,7 +102,7 @@ export default function ManageNotificationSounds() {
                     </DrawerFooter>
                 </DrawerContent>
             </Drawer>
-            <SoundPicker applySound={applySound} onSoundImported={onSoundImported} setIsPickerOpen={setIsPickerOpen} key={window.soundPickerReferenceID + isPickerOpen + importRefreshCounter || "soundPicker"} isOpen={isPickerOpen}></SoundPicker>
+            <SoundPicker applySound={applySound} onSoundListChanged={onSoundListChanged} setIsPickerOpen={setIsPickerOpen} key={window.soundPickerReferenceID + isPickerOpen + importRefreshCounter || "soundPicker"} isOpen={isPickerOpen}></SoundPicker>
         </div>
     );
 }
@@ -148,7 +148,7 @@ function SoundPicker(props) {
                     <div className="soundPackList">
                         {
                             soundPacks.map((soundPack, i) => {
-                                return (<SoundPack applySound={props.applySound} onSoundImported={props.onSoundImported} soundPack={soundPack} key={i}></SoundPack>);
+                                return (<SoundPack applySound={props.applySound} onSoundListChanged={props.onSoundListChanged} soundPack={soundPack} key={i}></SoundPack>);
                             })
                         }
                     </div>
@@ -173,6 +173,35 @@ function SoundPack(props) {
 
     let [trimSilence, setTrimSilence] = useState(true);
 
+    // Only Confirms When Deleting Would Actually Break Something - Checked Against EVERY
+    // AppReference, Not Just The One The Picker Was Opened For, Since The Underlying File
+    // Is Shared Across All Of Them.
+    let deleteSound = async (sound) => {
+        let usedBy = window.Config.AppReferences.filter((a) => a.SoundPath == sound.Path);
+
+        if (usedBy.length > 0) {
+            let confirmed = window.confirm(
+                `"${sound.Name}" is currently used by ${usedBy.length} notification sound${usedBy.length > 1 ? "s" : ""}. Delete it anyway?`
+            );
+            if (!confirmed) { return; }
+        }
+
+        let success = await igniteView.commandBridge.DeleteSound(sound.Path);
+        if (!success) { return; }
+
+        if (usedBy.length > 0) {
+            for (let i = 0; i < Config.AppReferences.length; i++) {
+                if (Config.AppReferences[i].SoundPath == sound.Path) {
+                    Config.AppReferences[i].SoundPath = "internal/default";
+                    Config.AppReferences[i].SoundDisplayName = "Default Sound";
+                }
+            }
+            UploadConfig();
+        }
+
+        props.onSoundListChanged();
+    };
+
     return (
         <div className="soundPack">
             <h3>{props.soundPack.Name}</h3>
@@ -192,6 +221,11 @@ function SoundPack(props) {
                                         <div className="activeCheckbox"><TbCheck/></div>
                                     )
                                 }
+                                {
+                                    sound.IsDeletable && (
+                                        <Button onClick={() => deleteSound(sound)} className="deleteSoundButton iconButton"><TbTrash/></Button>
+                                    )
+                                }
                                 <h5><span>{sound.Name}</span><Button onClick={() => playSound(sound)} className="iconButton"><TbVolume/></Button></h5>
                             </div>
                         );
@@ -203,7 +237,7 @@ function SoundPack(props) {
                             <Button onClick={async () => {
                                 let result = await igniteView.commandBridge.ImportSound(trimSilence);
                                 if (result.length == 2) {
-                                    props.onSoundImported();
+                                    props.onSoundListChanged();
                                 }
                             }} className="soundItemButton">
                                 <TbMusicPlus/>

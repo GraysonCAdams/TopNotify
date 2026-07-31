@@ -93,6 +93,14 @@
     font-size: 13px;
 }
 
+.soundItem .deleteSoundButton {
+    position: absolute !important;
+    top: 6px;
+    left: 6px;
+    /* Red rather than the standard icon-button blue, to read as destructive at a glance. */
+    background-color: #d9534f !important;
+}
+
 .soundItem .soundItemButton {
     width: 100%;
     height: calc(17vw);

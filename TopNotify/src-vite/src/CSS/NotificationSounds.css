@@ -58,7 +58,8 @@
 }
 
 .soundItem {
-    transition: opacity 0.3s;
+    position: relative;
+    transition: opacity 0.3s, outline-color 0.2s, background-color 0.2s;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -69,6 +70,27 @@
     max-height: 23vw;
     background-color: var(--col-tertiary);
     border-radius: 5px;
+    outline: 2px solid transparent;
+}
+
+.soundItem[data-active="true"] {
+    outline-color: #757DF9;
+    background-color: rgba(117, 125, 249, 0.18);
+}
+
+.soundItem .activeCheckbox {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background-color: #757DF9;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
 }
 
 .soundItem .soundItemButton {
@@ -93,6 +115,23 @@
 }
 
 .soundItem h5 {
-    margin: auto;
+    margin: 0;
+    width: 100%;
+    padding: 0 10px;
+    box-sizing: border-box;
     font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.soundItem h5 span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soundItem h5 .iconButton {
+    flex-shrink: 0;
 }

@@ -12,12 +12,13 @@ import {
     DrawerHeader
 } from "@chakra-ui/react";
 import React from "react";
-import { TbAlertTriangle, TbChevronDown, TbFolder, TbMusicPlus, TbPencil, TbVolume, TbX } from "react-icons/tb";
+import { TbAlertTriangle, TbCheck, TbChevronDown, TbFolder, TbMusicPlus, TbPencil, TbVolume, TbX } from "react-icons/tb";
 
 export default function ManageNotificationSounds() {
 
     let [isOpen, _setIsOpen] = useState(false);
     let [isPickerOpen, _setIsPickerOpen] = useState(false);
+    let [importRefreshCounter, setImportRefreshCounter] = useState(0);
 
     let setIsOpen = (v) => {
 
@@ -38,6 +39,10 @@ export default function ManageNotificationSounds() {
         _setIsPickerOpen(v);
     };
 
+    // Applies The Chosen Sound And Keeps The Picker Open So The User Can See Which
+    // Sound Is Now Active (Highlighted) And Keep Previewing/Browsing Others Instead Of
+    // Being Bounced Back To The App List On Every Click. UploadConfig() Already Triggers
+    // A Global Rerender, So The Highlight Updates Immediately Without An Extra Call.
     let applySound = (sound) => {
 
         for (let i = 0; i < Config.AppReferences.length; i++) {
@@ -49,8 +54,12 @@ export default function ManageNotificationSounds() {
         }
 
         UploadConfig();
-        setIsPickerOpen(false);
     };
+
+    // Bumps The SoundPicker Remount Key After A Successful Import So The Freshly
+    // Imported File Shows Up In "Your Collection" - The User Then Selects It Themselves
+    // From The List Rather Than Having It Auto-Applied.
+    let onSoundImported = () => setImportRefreshCounter(importRefreshCounter + 1);
 
     return (
         <div className="flexx facenter fillx gap20 buttonContainer">
@@ -93,7 +102,7 @@ export default function ManageNotificationSounds() {
                     </DrawerFooter>
                 </DrawerContent>
             </Drawer>
-            <SoundPicker applySound={applySound} setIsPickerOpen={setIsPickerOpen} key={window.soundPickerReferenceID + isPickerOpen || "soundPicker"} isOpen={isPickerOpen}></SoundPicker>
+            <SoundPicker applySound={applySound} onSoundImported={onSoundImported} setIsPickerOpen={setIsPickerOpen} key={window.soundPickerReferenceID + isPickerOpen + importRefreshCounter || "soundPicker"} isOpen={isPickerOpen}></SoundPicker>
         </div>
     );
 }
@@ -139,7 +148,7 @@ function SoundPicker(props) {
                     <div className="soundPackList">
                         {
                             soundPacks.map((soundPack, i) => {
-                                return (<SoundPack applySound={props.applySound} soundPack={soundPack} key={i}></SoundPack>);
+                                return (<SoundPack applySound={props.applySound} onSoundImported={props.onSoundImported} soundPack={soundPack} key={i}></SoundPack>);
                             })
                         }
                     </div>
@@ -157,6 +166,11 @@ function SoundPack(props) {
 
     let playSound = (sound) => igniteView.commandBridge.PreviewSound(sound.Path);
 
+    // The AppReference Currently Being Edited (Set By AppReferenceSoundItem.pickSound Before
+    // The Picker Opens) - Used To Figure Out Which Sound, If Any, Is Already Active So It
+    // Can Be Shown Highlighted Instead Of The User Having To Guess.
+    let currentAppReference = window.Config.AppReferences.find((a) => a.ID == window.soundPickerReferenceID);
+
     return (
         <div className="soundPack">
             <h3>{props.soundPack.Name}</h3>
@@ -165,12 +179,18 @@ function SoundPack(props) {
             <div className="soundList">
                 {
                     props.soundPack.Sounds.map((sound, i) => {
+                        let isActive = currentAppReference != null && currentAppReference.SoundPath == sound.Path;
                         return (
-                            <div className="soundItem" key={i}>
+                            <div className="soundItem" data-active={isActive.toString()} key={i}>
                                 <Button onClick={() => props.applySound(sound)} className="soundItemButton">
                                     <img src={sound.Icon}></img>
                                 </Button>
-                                <h5>{sound.Name}&nbsp;<Button onClick={() => playSound(sound)} className="iconButton"><TbVolume/></Button></h5>
+                                {
+                                    isActive && (
+                                        <div className="activeCheckbox"><TbCheck/></div>
+                                    )
+                                }
+                                <h5><span>{sound.Name}</span><Button onClick={() => playSound(sound)} className="iconButton"><TbVolume/></Button></h5>
                             </div>
                         );
                     })
@@ -181,12 +201,12 @@ function SoundPack(props) {
                             <Button onClick={async () => {
                                 let result = await igniteView.commandBridge.ImportSound();
                                 if (result.length == 2) {
-                                    props.applySound({ Path: result[0], Name: result[1] });
+                                    props.onSoundImported();
                                 }
                             }} className="soundItemButton">
                                 <TbMusicPlus/>
                             </Button>
-                            <h5>Import&nbsp;<Button onClick={() => igniteView.commandBridge.OpenSoundFolder()} className="iconButton"><TbFolder/></Button></h5>
+                            <h5><span>Import</span><Button onClick={() => igniteView.commandBridge.OpenSoundFolder()} className="iconButton"><TbFolder/></Button></h5>
                         </div>
                     )
                 }

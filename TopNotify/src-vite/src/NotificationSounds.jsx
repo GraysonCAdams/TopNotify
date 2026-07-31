@@ -18,7 +18,6 @@ export default function ManageNotificationSounds() {
 
     let [isOpen, _setIsOpen] = useState(false);
     let [isPickerOpen, _setIsPickerOpen] = useState(false);
-    let [importRefreshCounter, setImportRefreshCounter] = useState(0);
 
     let setIsOpen = (v) => {
 
@@ -55,11 +54,6 @@ export default function ManageNotificationSounds() {
 
         UploadConfig();
     };
-
-    // Bumps The SoundPicker Remount Key After A Successful Import Or Delete So The List
-    // Reflects The Change - The User Then Selects Imported Sounds Themselves Rather Than
-    // Having Them Auto-Applied.
-    let onSoundListChanged = () => setImportRefreshCounter(importRefreshCounter + 1);
 
     return (
         <div className="flexx facenter fillx gap20 buttonContainer">
@@ -102,7 +96,7 @@ export default function ManageNotificationSounds() {
                     </DrawerFooter>
                 </DrawerContent>
             </Drawer>
-            <SoundPicker applySound={applySound} onSoundListChanged={onSoundListChanged} setIsPickerOpen={setIsPickerOpen} key={window.soundPickerReferenceID + isPickerOpen + importRefreshCounter || "soundPicker"} isOpen={isPickerOpen}></SoundPicker>
+            <SoundPicker applySound={applySound} setIsPickerOpen={setIsPickerOpen} key={window.soundPickerReferenceID + isPickerOpen || "soundPicker"} isOpen={isPickerOpen}></SoundPicker>
         </div>
     );
 }
@@ -127,7 +121,25 @@ function AppReferenceSoundItem(props) {
 
 function SoundPicker(props) {
 
-    const soundPacks = JSON.parse(igniteView.withReact(React).useCommandResult("FindSounds") || "[]");
+    // Seeded once from the fetched result, then mutated locally on import/delete instead
+    // of remounting to refetch - remounting tears down and recreates the Drawer, which
+    // replays its slide-in animation on every single add/remove and is jarring.
+    const fetchedPacks = igniteView.withReact(React).useCommandResult("FindSounds");
+    let [soundPacks, setSoundPacks] = useState(() => JSON.parse(fetchedPacks || "[]"));
+
+    let removeSoundLocally = (soundPath) => {
+        setSoundPacks((prev) => prev.map((pack) => ({
+            ...pack,
+            Sounds: pack.Sounds.filter((s) => s.Path != soundPath)
+        })));
+    };
+
+    let addSoundLocally = (sound) => {
+        setSoundPacks((prev) => prev.map((pack) => {
+            if (pack.Name != "Your Collection") { return pack; }
+            return { ...pack, Sounds: [...pack.Sounds, sound] };
+        }));
+    };
 
     return (
         <Drawer
@@ -148,7 +160,7 @@ function SoundPicker(props) {
                     <div className="soundPackList">
                         {
                             soundPacks.map((soundPack, i) => {
-                                return (<SoundPack applySound={props.applySound} onSoundListChanged={props.onSoundListChanged} soundPack={soundPack} key={i}></SoundPack>);
+                                return (<SoundPack applySound={props.applySound} onSoundDeleted={removeSoundLocally} onSoundImported={addSoundLocally} soundPack={soundPack} key={i}></SoundPack>);
                             })
                         }
                     </div>
@@ -199,7 +211,7 @@ function SoundPack(props) {
             UploadConfig();
         }
 
-        props.onSoundListChanged();
+        props.onSoundDeleted(sound.Path);
     };
 
     return (
@@ -212,7 +224,7 @@ function SoundPack(props) {
                     props.soundPack.Sounds.map((sound, i) => {
                         let isActive = currentAppReference != null && currentAppReference.SoundPath == sound.Path;
                         return (
-                            <div className="soundItem" data-active={isActive.toString()} key={i}>
+                            <div className="soundItem" data-active={isActive.toString()} key={sound.Path}>
                                 <Button onClick={() => props.applySound(sound)} className="soundItemButton">
                                     <img src={sound.Icon}></img>
                                 </Button>
@@ -237,7 +249,9 @@ function SoundPack(props) {
                             <Button onClick={async () => {
                                 let result = await igniteView.commandBridge.ImportSound(trimSilence);
                                 if (result.length == 2) {
-                                    props.onSoundListChanged();
+                                    // Freshly imported, so it's always inside ImportedSoundFolder -
+                                    // matches what FindSounds would report on a real re-scan.
+                                    props.onSoundImported({ Path: result[0], Name: result[1], Icon: "/Image/Sound.svg", IsDeletable: true });
                                 }
                             }} className="soundItemButton">
                                 <TbMusicPlus/>

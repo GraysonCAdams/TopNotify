@@ -34,12 +34,17 @@ namespace TopNotify.GUI
             dynamic packToInject = soundPacks.Where((dynamic pack) => pack.ID == "custom_sound_path").FirstOrDefault();
             var soundFiles = GetImportedSoundFiles();
 
+            var importedFolderFull = Path.GetFullPath(ImportedSoundFolder);
+
             foreach (var soundFile in soundFiles)
             {
                 dynamic soundToInject = new ExpandoObject();
                 soundToInject.Path = "custom_sound_path/" + soundFile;
                 soundToInject.Name = Path.GetFileNameWithoutExtension(soundFile);
                 soundToInject.Icon = "/Image/Sound.svg";
+                // Only Files We Actually Copied Into ImportedSoundFolder Are Deletable -
+                // Never A File Picked Up From Scanning The User's Own Music Folder.
+                soundToInject.IsDeletable = Path.GetFullPath(soundFile).StartsWith(importedFolderFull, StringComparison.OrdinalIgnoreCase);
                 packToInject.Sounds.Add(soundToInject);
             }
 
@@ -105,6 +110,54 @@ namespace TopNotify.GUI
         public static void PreviewSound(string soundID)
         {
             SoundInterceptor.PlaySoundWithoutTimeout(soundID);
+        }
+
+        /// <summary>
+        /// Deletes an imported sound file (and its trim sidecar, if any). Only ever deletes
+        /// files inside ImportedSoundFolder - refuses for anything else (e.g. a file picked
+        /// up from scanning the user's own Music folder), matching the IsDeletable flag
+        /// FindSounds already reports so the GUI shouldn't even offer this for those.
+        /// </summary>
+        [Command("DeleteSound")]
+        public static bool DeleteSound(string soundPath)
+        {
+            if (string.IsNullOrEmpty(soundPath) || !soundPath.StartsWith("custom_sound_path/"))
+            {
+                return false;
+            }
+
+            var filePath = soundPath.Replace("custom_sound_path/", "");
+            var importedFolderFull = Path.GetFullPath(ImportedSoundFolder);
+            string fileFull;
+
+            try
+            {
+                fileFull = Path.GetFullPath(filePath);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            if (!fileFull.StartsWith(importedFolderFull, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            try
+            {
+                if (File.Exists(fileFull)) { File.Delete(fileFull); }
+
+                var trimSidecar = SilenceTrimmer.GetTrimSidecarPath(fileFull);
+                if (File.Exists(trimSidecar)) { File.Delete(trimSidecar); }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Program.Logger.Warning(ex, $"DeleteSound: failed to delete {fileFull}");
+                return false;
+            }
         }
 
         /// <summary>

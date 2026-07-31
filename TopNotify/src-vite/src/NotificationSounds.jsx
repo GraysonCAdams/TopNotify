@@ -1,4 +1,4 @@
-import { Button, Divider } from "@chakra-ui/react";
+import { Button, Checkbox, Divider } from "@chakra-ui/react";
 
 import { Fragment, useState } from "react";
 
@@ -171,6 +171,8 @@ function SoundPack(props) {
     // Can Be Shown Highlighted Instead Of The User Having To Guess.
     let currentAppReference = window.Config.AppReferences.find((a) => a.ID == window.soundPickerReferenceID);
 
+    let [trimSilence, setTrimSilence] = useState(true);
+
     return (
         <div className="soundPack">
             <h3>{props.soundPack.Name}</h3>
@@ -199,7 +201,7 @@ function SoundPack(props) {
                     props.soundPack.Name == "Your Collection" && (
                         <div className="soundItem" key={"add"}>
                             <Button onClick={async () => {
-                                let result = await igniteView.commandBridge.ImportSound();
+                                let result = await igniteView.commandBridge.ImportSound(trimSilence);
                                 if (result.length == 2) {
                                     props.onSoundImported();
                                 }
@@ -211,6 +213,13 @@ function SoundPack(props) {
                     )
                 }
             </div>
+            {
+                props.soundPack.Name == "Your Collection" && (
+                    <Checkbox className="trimSilenceOption" isChecked={trimSilence} onChange={(e) => setTrimSilence(e.target.checked)}>
+                        Trim leading silence when importing
+                    </Checkbox>
+                )
+            }
         </div>
     );
 }

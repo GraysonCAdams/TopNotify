@@ -270,15 +270,26 @@ namespace TopNotify.Daemon
         /// FLAC. Unlike SoundPlayer, MediaPlayer stops playback immediately when disposed,
         /// so the caller must be kept alive (via the Wait below) until MediaEnded fires -
         /// disposing right after calling Play() would truncate the sound before it's heard.
+        ///
+        /// If SilenceTrimmer found leading silence for this file (a ".trim" sidecar next to
+        /// it, written at import time), playback starts from that offset instead of 0 -
+        /// verified against a real trimmed file that playback duration actually shortens
+        /// by the expected amount, not just that no exception is thrown.
         /// </summary>
         static void PlaySoundBlocking(string filePath, int timeoutMs)
         {
             using (var player = new MediaPlayer())
             {
                 var tcs = new TaskCompletionSource<bool>();
+                var trimOffset = SilenceTrimmer.ReadTrimOffset(filePath);
 
                 player.MediaEnded += (s, e) => tcs.TrySetResult(true);
                 player.MediaFailed += (s, e) => tcs.TrySetException(new Exception($"MediaPlayer failed ({e.Error}): {e.ErrorMessage}"));
+
+                if (trimOffset.HasValue)
+                {
+                    player.MediaOpened += (s, e) => { player.PlaybackSession.Position = trimOffset.Value; };
+                }
 
                 player.Source = MediaSource.CreateFromUri(new Uri(filePath));
                 player.Play();

@@ -53,7 +53,9 @@ namespace TopNotify.GUI
         [Command("ImportSound")]
         public static string[] ImportSound()
         {
-            var filters = SupportedExtensions.Select(ext => new FileFilter(ext)).ToArray();
+            // A single combined filter, not one FileFilter per extension - keeps the dialog's
+            // dropdown to one "Audio Files" entry instead of listing each format separately.
+            var filters = new[] { new FileFilter("Audio Files", string.Join(";", SupportedExtensions)) };
             var soundPath = FileDialog.PickFile(filters);
 
             if (!string.IsNullOrEmpty(soundPath) && File.Exists(soundPath))

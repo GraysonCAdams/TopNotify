@@ -96,6 +96,15 @@
 .soundItem .soundItemButton {
     width: 100%;
     height: calc(17vw);
+    /* Chakra's Button defaults to a solid background (resolving to --col-bg, a solid
+       #222222) which sat on top of .soundItem's own translucent tile background,
+       showing as a mismatched grey box behind the icon. Let the tile's background
+       (and its active-state tint) show through instead. */
+    background-color: transparent !important;
+}
+
+.soundItem .soundItemButton:hover {
+    background-color: transparent !important;
 }
 
 .soundItem img, .soundItem > .soundItemButton svg {

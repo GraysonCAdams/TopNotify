@@ -108,12 +108,24 @@ function AppReferenceSoundItem(props) {
         props.setIsPickerOpen(true);
     };
 
+    // "internal/default" already means "inherit Other's sound" all the way down in
+    // GetSoundPath's fallback (live at playback time, not a snapshot) - this just surfaces
+    // that state visually instead of silently defaulting with no indication. Excludes
+    // "Other" itself, since it's the thing being inherited from, not an inheritor.
+    let isInherited = props.appReference.ID != "Other" && props.appReference.SoundPath == "internal/default";
+
+    // While inherited, show what it actually resolves to right now (Other's current
+    // sound) rather than the stored SoundDisplayName, which would go stale the moment
+    // Other's own sound changes.
+    let otherAppReference = window.Config.AppReferences.find((a) => a.ID == "Other");
+    let displayedSoundName = (isInherited && otherAppReference) ? otherAppReference.SoundDisplayName : props.appReference.SoundDisplayName;
+
     return (
-        <div className="appReferenceSoundItem">
+        <div className="appReferenceSoundItem" data-inherited={isInherited.toString()}>
             <img src={props.appReference.DisplayIcon || "/Image/DefaultAppReferenceIcon.svg"}></img>
             <h4>{props.appReference.DisplayName}</h4>
             <div className="selectSoundButton">
-                <Button onClick={pickSound}>{props.appReference.SoundDisplayName}&nbsp;<TbPencil/></Button>
+                <Button onClick={pickSound}>{displayedSoundName}&nbsp;<TbPencil/></Button>
             </div>
         </div>
     );
@@ -189,6 +201,15 @@ function SoundPack(props) {
     // Can Be Shown Highlighted Instead Of The User Having To Guess.
     let currentAppReference = window.Config.AppReferences.find((a) => a.ID == window.soundPickerReferenceID);
 
+    // If This App Hasn't Been Given Its Own Preference, It's Inheriting Other's Sound -
+    // Highlight Whatever That Actually Resolves To Right Now, Not The Literal
+    // "internal/default" Tile, So The Picker Matches What's Shown (And Actually Plays).
+    let effectiveSoundPath = currentAppReference?.SoundPath;
+    if (effectiveSoundPath == "internal/default" && currentAppReference?.ID != "Other") {
+        let otherAppReference = window.Config.AppReferences.find((a) => a.ID == "Other");
+        effectiveSoundPath = otherAppReference ? otherAppReference.SoundPath : effectiveSoundPath;
+    }
+
     let [trimSilence, setTrimSilence] = useState(true);
 
     // Only Confirms When Deleting Would Actually Break Something - Checked Against EVERY
@@ -228,7 +249,7 @@ function SoundPack(props) {
             <div className="soundList">
                 {
                     props.soundPack.Sounds.map((sound, i) => {
-                        let isActive = currentAppReference != null && currentAppReference.SoundPath == sound.Path;
+                        let isActive = effectiveSoundPath != null && effectiveSoundPath == sound.Path;
                         return (
                             <div className="soundItem" data-active={isActive.toString()} key={sound.Path}>
                                 <Button onClick={() => props.applySound(sound)} className="soundItemButton">

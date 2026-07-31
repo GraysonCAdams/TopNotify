@@ -18,6 +18,13 @@
     height: 24px;
 }
 
+/* Deliberately not data-greyed-out - that attribute sets pointer-events: none app-wide,
+   which would make the row unclickable. This needs to stay clickable so the user can
+   give the app its own preference, which is the whole point of showing it dimmed. */
+.appReferenceSoundItem[data-inherited="true"] {
+    opacity: 0.6;
+}
+
 .soundPackList {
     display: flex;
     justify-content: center;

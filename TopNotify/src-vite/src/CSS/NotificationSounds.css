@@ -126,7 +126,10 @@
 .soundItem h5 {
     margin: 0;
     width: 100%;
-    padding: 0 10px;
+    /* Asymmetric on purpose: left padding gives the truncated name room to breathe,
+       right padding is minimal so the icon button anchors to the tile's true edge
+       instead of floating in dead space that made it read as an inline glyph. */
+    padding: 0 4px 0 10px;
     box-sizing: border-box;
     font-size: 0.8rem;
     display: flex;

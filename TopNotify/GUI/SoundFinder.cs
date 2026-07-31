@@ -55,7 +55,13 @@ namespace TopNotify.GUI
         {
             // A single combined filter, not one FileFilter per extension - keeps the dialog's
             // dropdown to one "Audio Files" entry instead of listing each format separately.
-            var filters = new[] { new FileFilter("Audio Files", string.Join(";", SupportedExtensions)) };
+            // The underlying dialog is Native File Dialog Extended (NFDe, via IgniteView's
+            // NFDBindings) - confirmed by decompiling IgniteView.FileDialogs.dll that Pattern
+            // is passed through to NFDFilterU8.Spec verbatim, with zero transformation. NFDe's
+            // spec format is a COMMA-separated extension list, not semicolon-separated - a
+            // semicolon-joined pattern silently matches nothing.
+            var filterName = $"Audio Files ({string.Join(", ", SupportedExtensions.Select(ext => ext.ToUpper()))})";
+            var filters = new[] { new FileFilter(filterName, string.Join(",", SupportedExtensions)) };
             var soundPath = FileDialog.PickFile(filters);
 
             if (!string.IsNullOrEmpty(soundPath) && File.Exists(soundPath))

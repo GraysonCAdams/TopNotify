@@ -1,6 +1,6 @@
 import { Button, Checkbox, Divider } from "@chakra-ui/react";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import "./CSS/NotificationSounds.css";
 
@@ -121,11 +121,17 @@ function AppReferenceSoundItem(props) {
 
 function SoundPicker(props) {
 
-    // Seeded once from the fetched result, then mutated locally on import/delete instead
-    // of remounting to refetch - remounting tears down and recreates the Drawer, which
-    // replays its slide-in animation on every single add/remove and is jarring.
+    // useCommandResult resolves asynchronously - a useState lazy initializer only runs on
+    // the very first render, before the result has actually arrived, which permanently
+    // seeded an empty list and left the picker blank. useEffect re-syncs local state
+    // whenever fetchedPacks actually changes, while still letting removeSoundLocally/
+    // addSoundLocally mutate on top afterward without a fetchedPacks change stomping them.
     const fetchedPacks = igniteView.withReact(React).useCommandResult("FindSounds");
-    let [soundPacks, setSoundPacks] = useState(() => JSON.parse(fetchedPacks || "[]"));
+    let [soundPacks, setSoundPacks] = useState([]);
+
+    useEffect(() => {
+        setSoundPacks(JSON.parse(fetchedPacks || "[]"));
+    }, [fetchedPacks]);
 
     let removeSoundLocally = (soundPath) => {
         setSoundPacks((prev) => prev.map((pack) => ({

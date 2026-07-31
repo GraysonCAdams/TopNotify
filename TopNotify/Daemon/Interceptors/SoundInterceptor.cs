@@ -9,12 +9,13 @@ using System.Drawing;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
-using System.Media;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using TopNotify.Common;
+using Windows.Media.Core;
+using Windows.Media.Playback;
 using Windows.UI.Notifications;
 
 namespace TopNotify.Daemon
@@ -29,6 +30,12 @@ namespace TopNotify.Daemon
         const int MAX_QUEUED_SOUNDS = 8;
         readonly BlockingCollection<string> soundQueue = new BlockingCollection<string>(MAX_QUEUED_SOUNDS);
         bool consumerStarted = false;
+
+        // Ceiling on a single sound's playback wait. MediaPlayer is event-driven rather
+        // than synchronous like the old SoundPlayer, so without a bound a corrupted or
+        // unsupported file whose MediaEnded/MediaFailed never fires would wedge the
+        // consumer thread forever, silencing every notification sound after it.
+        const int MAX_PLAYBACK_WAIT_MS = 30000;
 
         bool allowedToPlaySound = false;
 
@@ -223,11 +230,7 @@ namespace TopNotify.Daemon
             {
                 try
                 {
-                    using (var player = new SoundPlayer(soundFilePath))
-                    {
-                        player.Load();
-                        player.PlaySync();
-                    }
+                    PlaySoundBlocking(soundFilePath, MAX_PLAYBACK_WAIT_MS);
                 }
                 catch (Exception ex)
                 {
@@ -239,7 +242,8 @@ namespace TopNotify.Daemon
         }
 
         /// <summary>
-        /// Plays a sound without any delay or timeout
+        /// Plays a sound without any delay or timeout (fire-and-forget from the caller's
+        /// perspective - runs on its own background task).
         /// </summary>
         public static void PlaySoundWithoutTimeout(string soundPath)
         {
@@ -247,11 +251,43 @@ namespace TopNotify.Daemon
 
             Task.Run(() =>
             {
-                using (var p = new SoundPlayer(soundFilePath))
+                try
                 {
-                    p.Play();
+                    PlaySoundBlocking(soundFilePath, MAX_PLAYBACK_WAIT_MS);
+                }
+                catch (Exception ex)
+                {
+                    Program.Logger.Warning(ex, $"SoundInterceptor: preview playback failed for {soundFilePath}");
                 }
             });
+        }
+
+        /// <summary>
+        /// Plays a single sound file to completion (or until timeoutMs elapses / playback
+        /// fails) using Windows.Media.Playback.MediaPlayer, which - unlike the old
+        /// System.Media.SoundPlayer (a thin wrapper over the WAV-only Win32 PlaySound API) -
+        /// is backed by Media Foundation and natively decodes WAV, MP3, AAC/M4A, WMA, and
+        /// FLAC. Unlike SoundPlayer, MediaPlayer stops playback immediately when disposed,
+        /// so the caller must be kept alive (via the Wait below) until MediaEnded fires -
+        /// disposing right after calling Play() would truncate the sound before it's heard.
+        /// </summary>
+        static void PlaySoundBlocking(string filePath, int timeoutMs)
+        {
+            using (var player = new MediaPlayer())
+            {
+                var tcs = new TaskCompletionSource<bool>();
+
+                player.MediaEnded += (s, e) => tcs.TrySetResult(true);
+                player.MediaFailed += (s, e) => tcs.TrySetException(new Exception($"MediaPlayer failed ({e.Error}): {e.ErrorMessage}"));
+
+                player.Source = MediaSource.CreateFromUri(new Uri(filePath));
+                player.Play();
+
+                if (!tcs.Task.Wait(timeoutMs))
+                {
+                    throw new TimeoutException($"Playback of \"{filePath}\" did not complete within {timeoutMs}ms");
+                }
+            }
         }
 
         public override void Reflow()

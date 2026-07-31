@@ -51,7 +51,7 @@ namespace TopNotify.GUI
         /// Opens a file dialog to select a sound file and imports it
         /// </summary>
         [Command("ImportSound")]
-        public static string[] ImportSound()
+        public static async Task<string[]> ImportSound(bool trimSilence)
         {
             // A single combined filter, not one FileFilter per extension - keeps the dialog's
             // dropdown to one "Audio Files" entry instead of listing each format separately.
@@ -84,6 +84,14 @@ namespace TopNotify.GUI
 
                 var copiedSoundPath = Path.Join(ImportedSoundFolder, soundName + "." + extension);
                 File.Copy(soundPath, copiedSoundPath, true);
+
+                if (trimSilence)
+                {
+                    // Awaited So The Sidecar Is Already In Place By The Time The Import
+                    // Promise Resolves And The User Can Preview/Select The New Sound.
+                    await SilenceTrimmer.DetectAndStoreTrim(copiedSoundPath);
+                }
+
                 return new string[] { "custom_sound_path/" + copiedSoundPath, Path.GetFileNameWithoutExtension(soundPath) };
             }
 

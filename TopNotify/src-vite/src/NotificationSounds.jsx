@@ -12,7 +12,7 @@ import {
     DrawerHeader
 } from "@chakra-ui/react";
 import React from "react";
-import { TbAlertTriangle, TbCheck, TbChevronDown, TbFolder, TbMusicPlus, TbPencil, TbTrash, TbVolume, TbX } from "react-icons/tb";
+import { TbAlertTriangle, TbCheck, TbChevronDown, TbFolder, TbMusicPlus, TbPencil, TbTrash, TbVolume } from "react-icons/tb";
 
 export default function ManageNotificationSounds() {
 
@@ -169,7 +169,7 @@ function SoundPicker(props) {
             <DrawerContent>
                 
                 <div className="windowCloseButton">
-                    <Button className="iconButton" onClick={() => props.setIsPickerOpen(false)}><TbX/></Button>
+                    <Button className="iconButton" onClick={() => props.setIsPickerOpen(false)}><TbChevronDown/></Button>
                 </div>
 
                 <DrawerHeader>Select Sound</DrawerHeader>

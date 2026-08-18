@@ -275,11 +275,21 @@ namespace TopNotify.Daemon
         /// it, written at import time), playback starts from that offset instead of 0 -
         /// verified against a real trimmed file that playback duration actually shortens
         /// by the expected amount, not just that no exception is thrown.
+        ///
+        /// CommandManager.IsEnabled is turned off before playback starts - MediaPlayer
+        /// otherwise auto-registers each instance with System Media Transport Controls,
+        /// which put a "Now Playing" card on the lock screen and fire AVRCP track-change
+        /// events at connected Bluetooth devices. Since a fresh MediaPlayer is created per
+        /// notification, that meant every notification looked to Bluetooth headphones like
+        /// a new player starting a new track, forcing a connection/codec resync each time -
+        /// confirmed by TopNotify appearing as a media session on the lock screen.
         /// </summary>
         static void PlaySoundBlocking(string filePath, int timeoutMs)
         {
             using (var player = new MediaPlayer())
             {
+                player.CommandManager.IsEnabled = false;
+
                 var tcs = new TaskCompletionSource<bool>();
                 var trimOffset = SilenceTrimmer.ReadTrimOffset(filePath);
 
